@@ -41,7 +41,7 @@ class PreTrainedModelMixin(PreTrainedModel):
         self.num_post_layers = config.num_post_layers  # 8
         self.num_iterations = config.num_iterations  # 1
         self.layer_iterations = config.layer_iterations
-        
+
         assert self.config_class is not None
         self.generation_config = GenerationConfig.from_model_config(self.config)
 
@@ -605,7 +605,13 @@ class BaseModelMixin(PreTrainedModelMixin):
         if self.position_embedding_type == "learned_absolute":
             self.wpe = ParameterizedEmbedding(max_position_embeddings, self.embed_dim, std=self.initializer_range)
         elif self.position_embedding_type == "rope":
-            if self.config.rope_scaling is None:
+            rope_scaling = self.config.rope_scaling
+            needs_scaled_rope = (
+                rope_scaling is not None
+                and isinstance(rope_scaling, dict)
+                and "factor" in rope_scaling
+            )
+            if not needs_scaled_rope:
                 self.rope = RoPE(
                     self.rope_dim,
                     max_position_embeddings=max_position_embeddings,
@@ -616,8 +622,8 @@ class BaseModelMixin(PreTrainedModelMixin):
                     self.rope_dim,
                     max_position_embeddings=max_position_embeddings,
                     base=self.config.rope_theta,
-                    scale=self.config.rope_scaling["factor"],
-                    original_max_position_embeddings=self.config.rope_scaling["original_max_position_embeddings"],
+                    scale=rope_scaling["factor"],
+                    original_max_position_embeddings=rope_scaling["original_max_position_embeddings"],
                 )
         elif self.position_embedding_type == "nope":
             pass

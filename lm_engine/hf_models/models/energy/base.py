@@ -12,16 +12,19 @@ from .layer import EnergyBlock
 class EnergyPreTrainedModel(PreTrainedModelMixin):
     config_class = EnergyConfig
     layer_class = EnergyBlock
+    _no_split_modules_override = None
 
     @property
     def _no_split_modules(self):
-        # When shared_backbone=True, all EnergyBlocks share the same attn/ffwd/ln
-        # tensors. FSDP2 can't shard parameters that already belong to another
-        # fully_shard'd module, so we skip per-block wrapping and let only the
-        # top-level model get wrapped (DDP-style with stage=0).
+        if self._no_split_modules_override is not None:
+            return self._no_split_modules_override
         if getattr(self.config, "shared_backbone", False):
             return []
         return ["EnergyBlock"]
+
+    @_no_split_modules.setter
+    def _no_split_modules(self, value):
+        self._no_split_modules_override = value
 
 
 class EnergyModel(EnergyPreTrainedModel, BaseModelMixin): ...
