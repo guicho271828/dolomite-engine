@@ -164,6 +164,7 @@ class CausalLMModelMixin(PreTrainedModelMixin):
         temperature: float = 0,
         top_k: int | None = None,
         top_p: float | None = None,
+        past_key_values=None,
         **kwargs,
     ) -> torch.Tensor:
         assert not self.use_padding_free_transformer
@@ -182,6 +183,14 @@ class CausalLMModelMixin(PreTrainedModelMixin):
             pad_token_id = self.generation_config.eos_token_id
 
         kwargs.pop("use_cache", None)
+        kwargs.pop("tokenizer", None)
+
+        generation_config = kwargs.pop("generation_config", None)
+        if generation_config is not None:
+            if max_new_tokens == 20 and getattr(generation_config, "max_new_tokens", None) is not None:
+                max_new_tokens = generation_config.max_new_tokens
+            if getattr(generation_config, "eos_token_id", None) is not None:
+                self.generation_config.eos_token_id = generation_config.eos_token_id
 
         if "do_sample" in kwargs:
             if kwargs.pop("do_sample"):
@@ -194,10 +203,10 @@ class CausalLMModelMixin(PreTrainedModelMixin):
         if stopping_criteria_list is not None:
             stopping_criteria_list = StoppingCriteriaList(stopping_criteria_list)
 
-        assert len(kwargs) == 0
+        assert len(kwargs) == 0, f"Unexpected kwargs: {list(kwargs.keys())}"
 
         # prefill
-        output = self(input_ids=input_ids, attention_mask=attention_mask)
+        output = self(input_ids=input_ids, attention_mask=attention_mask, past_key_values=past_key_values)
         finished = torch.zeros(input_ids.size(0), device=input_ids.device, dtype=torch.bool)
 
         # decode
