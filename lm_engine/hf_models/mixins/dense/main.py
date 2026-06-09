@@ -205,6 +205,14 @@ class CausalLMModelMixin(PreTrainedModelMixin):
 
         assert len(kwargs) == 0, f"Unexpected kwargs: {list(kwargs.keys())}"
 
+        # Track initial cache length for attention mask sizing
+        initial_cache_len = 0
+        if past_key_values is not None:
+            if hasattr(past_key_values, 'get_seq_length'):
+                initial_cache_len = past_key_values.get_seq_length()
+            elif hasattr(past_key_values, 'layers') and len(past_key_values.layers) > 0:
+                initial_cache_len = past_key_values.layers[0].keys.shape[2]
+
         # prefill
         output = self(input_ids=input_ids, attention_mask=attention_mask, past_key_values=past_key_values)
         finished = torch.zeros(input_ids.size(0), device=input_ids.device, dtype=torch.bool)
@@ -220,7 +228,7 @@ class CausalLMModelMixin(PreTrainedModelMixin):
             else:
                 attention_mask = torch.ones(
                     input_ids.size(0),
-                    input_ids.size(1) + num_generated_tokens + 1,
+                    initial_cache_len + input_ids.size(1) + num_generated_tokens + 1,
                     device=input_ids.device,
                     dtype=torch.int32,
                 )
